@@ -1,0 +1,1553 @@
+<!doctype html>
+<html lang="en" class="h-full">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sri Adichunchanagiri composite English High School - Student Performance Analytics</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1976d2">
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('service-worker.js');
+      });
+    }
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Added DataLabels Plugin -->
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+  <style>
+    body {
+      box-sizing: border-box;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    .nav-item {
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .nav-item:hover {
+      background-color: rgba(255, 255, 255, 0.15);
+      transform: translateX(8px);
+    }
+
+    .nav-item.active {
+      background-color: rgba(255, 255, 255, 0.2);
+      border-left: 5px solid #ff751f;
+      font-weight: 600;
+    }
+
+    .metric-card {
+      transition: all 0.3s ease;
+      cursor: pointer;
+      border-left: 5px solid transparent;
+    }
+
+    .metric-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+      border-left-color: #ff751f;
+    }
+
+    .chart-wrapper {
+      position: relative;
+      height: 320px;
+    }
+
+    .mini-chart-wrapper {
+      position: relative;
+      height: 200px;
+    }
+
+    .student-row {
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .student-row:hover {
+      background-color: rgba(255, 117, 31, 0.08);
+      transform: scale(1.01);
+    }
+
+    .grade-card {
+      transition: all 0.3s ease;
+      cursor: pointer;
+      border: 2px solid transparent;
+    }
+
+    .grade-card:hover {
+      border-color: #ff751f;
+      box-shadow: 0 8px 20px rgba(255, 117, 31, 0.2);
+      transform: translateY(-4px);
+    }
+
+    .heatmap-cell {
+      transition: all 0.2s ease;
+    }
+
+    .heatmap-cell:hover {
+      transform: scale(1.1);
+      z-index: 10;
+    }
+
+    .skeleton {
+      background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+      background-size: 200% 100%;
+      animation: skeleton-loading 1.5s infinite;
+      border-radius: 4px;
+    }
+
+    @keyframes skeleton-loading {
+      0% {
+        background-position: 200% 0;
+      }
+
+      100% {
+        background-position: -200% 0;
+      }
+    }
+
+    @media print {
+
+      header,
+      aside,
+      .action-button,
+      #back-to-students,
+      button {
+        display: none !important;
+      }
+
+      main {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      .section-content:not(#report-card) {
+        display: none !important;
+      }
+
+      #report-card {
+        display: block !important;
+        padding: 20px;
+      }
+
+      .bg-gradient-to-r {
+        background: #f3f4f6 !important;
+        color: black !important;
+        border: 1px solid #ddd;
+      }
+
+      .text-white {
+        color: black !important;
+      }
+    }
+
+    .insight-card {
+      background-color: #f8fafc;
+      border-left: 4px solid;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+
+<body class="h-full bg-gray-50">
+  <div id="login-container" style="display:flex;align-items:center;justify-content:center;height:100vh;background:#f5f5f5;position:fixed;top:0;left:0;width:100vw;z-index:10000;">
+    <form id="login-form" style="background:#fff;padding:2rem 2.5rem;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.1);min-width:300px;">
+      <h2 style="text-align:center;margin-bottom:1.5rem;color:#1976d2;">Login</h2>
+      <div style="margin-bottom:1rem;">
+        <label for="username" style="display:block;margin-bottom:0.5rem;">Username</label>
+        <input type="text" id="username" name="username" required style="width:100%;padding:0.5rem;border:1px solid #ccc;border-radius:5px;">
+      </div>
+      <div style="margin-bottom:1.5rem;">
+        <label for="password" style="display:block;margin-bottom:0.5rem;">Password</label>
+        <input type="password" id="password" name="password" required style="width:100%;padding:0.5rem;border:1px solid #ccc;border-radius:5px;">
+      </div>
+      <button type="submit" style="width:100%;padding:0.7rem;background:#1976d2;color:#fff;border:none;border-radius:5px;font-size:1rem;">Login</button>
+      <div id="login-error" style="color:red;text-align:center;margin-top:1rem;display:none;">Invalid credentials</div>
+    </form>
+  </div>
+  <div id="dashboard-content" style="display:none;">
+    <!-- ...existing dashboard HTML content (everything previously in <body>)... -->
+    <!-- Header -->
+    <header class="fixed top-0 left-0 right-0 h-20 z-30 shadow-lg" id="header" style="background-color: #347363;">
+      <div class="h-full px-8 flex items-center justify-between relative">
+        <div class="flex items-center space-x-4">
+          <img src="https://www.northsouth.org/wp-content/uploads/2024/09/nsf-logov1.png" alt="School Logo"
+            class="h-14 w-auto rounded-lg shadow-md bg-white p-1" id="logo-icon"
+            onerror="this.src='https://placehold.co/100x100?text=LOGO'">
+        </div>
+        <div class="absolute left-1/2 transform -translate-x-1/2 text-center w-full max-w-2xl">
+          <h1 class="text-xl md:text-2xl font-bold text-white leading-tight" id="dashboard-title">Sri Adichunchanagiri
+            composite English High School</h1>
+          <div class="flex items-center justify-center gap-3">
+            <p class="text-xs text-white opacity-90" id="subtitle">Student Performance Analytics Dashboard</p>
+            <span id="upload-status"
+              class="text-xs bg-white/20 text-white px-2 py-0.5 rounded font-bold uppercase tracking-wider">Cloud Sync
+              Ready</span>
+          </div>
+        </div>
+        <div class="flex items-center space-x-4">
+          <button onclick="syncWithGoogleSheets()"
+            class="p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors flex items-center gap-2 text-xs font-bold border border-white/20">
+            <span>🔄</span> <span class="hidden lg:inline">Sync Data</span>
+          </button>
+          <div class="text-right hidden sm:block">
+            <p class="text-sm font-semibold text-white" id="user-role">Administrator</p>
+            <p class="text-xs text-white opacity-75" id="user-status">School Principal</p>
+          </div>
+          <div class="w-10 h-10 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-md"
+            id="user-avatar" style="background-color: #ff751f;">
+            👤
+          </div>
+        </div>
+      </div>
+    </header>
+    <!-- ...rest of dashboard HTML (sidebar, main, etc.)... -->
+    ...existing code...
+  </div>
+  <script>
+    // Simple login logic
+    const loginForm = document.getElementById('login-form');
+    const loginContainer = document.getElementById('login-container');
+    const dashboardContent = document.getElementById('dashboard-content');
+    const loginError = document.getElementById('login-error');
+    loginForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      if (username === '809264' && password === 'ADC@379') {
+        loginContainer.style.display = 'none';
+        dashboardContent.style.display = 'block';
+      } else {
+        loginError.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+
+  <script>
+    // ===== CLOUD SYNC CONFIGURATION =====
+    const SHEET_LINKS = {
+      master: "https://docs.google.com/spreadsheets/d/e/2PACX-1vS28zbQxbSI37rcO4NFdwz5X8CwjLF9Js1h0iS8jGA5EB91M_LsXukyALT69oI3VLeAXEE1afQOox24/pub?gid=0&single=true&output=csv",
+      math: "https://docs.google.com/spreadsheets/d/e/2PACX-1vS28zbQxbSI37rcO4NFdwz5X8CwjLF9Js1h0iS8jGA5EB91M_LsXukyALT69oI3VLeAXEE1afQOox24/pub?gid=747646724&single=true&output=csv",
+      english: "https://docs.google.com/spreadsheets/d/e/2PACX-1vS28zbQxbSI37rcO4NFdwz5X8CwjLF9Js1h0iS8jGA5EB91M_LsXukyALT69oI3VLeAXEE1afQOox24/pub?gid=1062295802&single=true&output=csv",
+      mapping: "https://docs.google.com/spreadsheets/d/e/2PACX-1vS28zbQxbSI37rcO4NFdwz5X8CwjLF9Js1h0iS8jGA5EB91M_LsXukyALT69oI3VLeAXEE1afQOox24/pub?gid=1476979886&single=true&output=csv"
+    };
+
+    // ===== DATA STRUCTURES =====
+    let masterList = new Map();
+    let mathResults = new Map();
+    let englishResults = new Map();
+    let loMap = new Map();
+    let allStudentsData = [];
+
+    let participationDonut, gradeParticipationChart, questionPerformanceChart;
+
+    let currentParticipationGrade = null;
+    let currentCurriculumDrilldown = { type: null, value: null };
+
+    // ===== QUESTION PAPERS CONFIGURATION =====
+    // Use this to map grades to specific Google Drive FILE PREVIEW links if you have them.
+    // Since we only have the folder link, we will default to the Folder View inside the modal.
+    const FOLDER_LINK = "https://drive.google.com/embeddedfolderview?id=1N_IMXTTAMIPlBZHLMM7PHE1hsBMZ9Bcj#grid";
+    const QUESTION_PAPERS = {
+      1: "https://drive.google.com/file/d/1NvZsfQBGNJok9xTUvp1GtprQeZETCXiY/preview",
+      2: "https://drive.google.com/file/d/13pD-skfeQ-yXF04oV5ZpL_inrwxMElyH/preview",
+      3: "https://drive.google.com/file/d/1mLX7v8g6wlVRCSnRxKo-mQod8SPYwNJj/preview",
+      4: "https://drive.google.com/file/d/1wBtSc8W7YNkmAY8CyMqrQjtAhN1i0iC5/preview",
+      5: "https://drive.google.com/file/d/19jZZF6KJusJZv9ffzHeOpOwX0FoKZqjA/preview",
+      6: "https://drive.google.com/file/d/1qc6O2u84kpUEUXpJaZm98Ph2nzGYJ-RK/preview",
+      7: "https://drive.google.com/file/d/1ymeX-xDXR-GXg6nXLQs6urgGT1V-3vJO/preview",
+      8: "https://drive.google.com/file/d/1ymeX-xDXR-GXg6nXLQs6urgGT1V-3vJO/preview",
+      9: "https://drive.google.com/file/d/1ymeX-xDXR-GXg6nXLQs6urgGT1V-3vJO/preview",
+      10: "https://drive.google.com/file/d/1ymeX-xDXR-GXg6nXLQs6urgGT1V-3vJO/preview"
+    };
+
+    // ===== EXCEL EXPORT UTILITY =====
+    function exportTableToExcel(tbodyId, filename) {
+      const tbody = document.getElementById(tbodyId);
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+
+      // Extract headers from the table relative to the body
+      const table = tbody.closest('table');
+      const headerRow = table.querySelector('thead tr');
+      const headers = Array.from(headerRow.querySelectorAll('th')).map(th => th.innerText);
+
+      let csvContent = headers.join(",") + "\n";
+
+      rows.forEach(row => {
+        const rowData = Array.from(row.querySelectorAll('td')).map(td => {
+          let text = td.innerText.replace(/,/g, "").replace(/\n/g, " ");
+          return `"${text}"`;
+        });
+        csvContent += rowData.join(",") + "\n";
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `${filename}_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // ===== LOADING SKELETONS =====
+    function showSkeletons(targetId, rowCount = 5, colCount = 8) {
+      const container = document.getElementById(targetId);
+      if (!container) return;
+
+      let html = '';
+      for (let i = 0; i < rowCount; i++) {
+        html += `<tr class="border-b">`;
+        for (let j = 0; j < colCount; j++) {
+          html += `<td class="p-4"><div class="h-4 skeleton w-full"></div></td>`;
+        }
+        html += `</tr>`;
+      }
+      container.innerHTML = html;
+    }
+
+    // ===== DATA MANAGEMENT =====
+    async function syncWithGoogleSheets() {
+      const statusEl = document.getElementById('upload-status');
+
+      statusEl.textContent = "🔄 Synchronizing...";
+      statusEl.className = "text-xs bg-indigo-500 text-white px-2 py-0.5 rounded font-bold uppercase tracking-wider animate-pulse";
+
+      // Show skeletons in tables while loading
+      showSkeletons('all-students-table-body', 10, 8);
+      showSkeletons('math-gap-distribution-body', 5, 9);
+      showSkeletons('english-gap-distribution-body', 5, 9);
+
+      let combinedData = [];
+
+      const fetchCSV = (url, type) => {
+        return new Promise((resolve, reject) => {
+          if (!url) { resolve(); return; }
+          Papa.parse(url, {
+            download: true,
+            header: true,
+            skipEmptyLines: true,
+            complete: function (results) {
+              const rows = results.data.map(row => ({ ...row, file_type: type }));
+              combinedData = combinedData.concat(rows);
+              resolve();
+            },
+            error: function (err) {
+              reject(`Error fetching ${type} sheet: ${err.message}`);
+            }
+          });
+        });
+      };
+
+      try {
+        await Promise.all([
+          fetchCSV(SHEET_LINKS.master, 'master'),
+          fetchCSV(SHEET_LINKS.math, 'math'),
+          fetchCSV(SHEET_LINKS.english, 'english'),
+          fetchCSV(SHEET_LINKS.mapping, 'mapping')
+        ]);
+
+        if (combinedData.length > 0) {
+          masterList.clear();
+          mathResults.clear();
+          englishResults.clear();
+          loMap.clear();
+          allStudentsData = [];
+
+          processSheetData(combinedData);
+
+          statusEl.textContent = "✅ Sync Successful";
+          statusEl.className = "text-xs bg-green-500 text-white px-2 py-0.5 rounded font-bold uppercase tracking-wider";
+        }
+      } catch (error) {
+        statusEl.textContent = "❌ Sync Failed";
+        statusEl.className = "text-xs bg-red-500 text-white px-2 py-0.5 rounded font-bold uppercase tracking-wider";
+        console.error(error);
+      }
+    }
+
+    // ===== CORE ALGORITHM =====
+    function calculateMasteryLevel(answers, levels) {
+      if (!answers || !levels || answers.length !== levels.length) return 0;
+      const stats = {};
+      for (let i = 0; i < answers.length; i++) {
+        const level = levels[i];
+        const ans = answers[i];
+        if (isNaN(level) || isNaN(ans)) continue;
+
+        if (!stats[level]) stats[level] = { correct: 0, total: 0 };
+        stats[level].total++;
+        if (ans === 1) stats[level].correct++;
+      }
+
+      let highestPassed = -1;
+      for (let g = 6; g >= 0; g--) {
+        if (stats[g] && stats[g].total > 0 && (stats[g].correct / stats[g].total) >= 0.60) {
+          highestPassed = g;
+          break;
+        }
+      }
+
+      if (highestPassed === -1) return 0;
+      return highestPassed + 1;
+    }
+
+    function processSheetData(sheetData) {
+      if (!sheetData || sheetData.length === 0) return;
+
+      const masterRecords = sheetData.filter(r => r.file_type === 'master');
+      const mathRecords = sheetData.filter(r => r.file_type === 'math');
+      const englishRecords = sheetData.filter(r => r.file_type === 'english');
+      const mapRecords = sheetData.filter(r => r.file_type === 'mapping');
+
+      mapRecords.forEach(record => {
+        const grade = record.grade || record.grade_level;
+        const subject = record.subject;
+        const qNum = record.question_number;
+        const lo = record.learning_objective;
+        if (grade && subject && qNum && lo && lo.trim() !== "") {
+          const normSubject = subject.toLowerCase().includes('math') ? 'Math' : 'English';
+          loMap.set(`${normSubject}-${grade}-${qNum}`, lo.trim());
+        }
+      });
+
+      masterRecords.forEach(record => {
+        const studentId = record.student_id || record.login_id;
+        const regGrade = parseInt(record.registered_grade);
+
+        // Data Validation: Skip records with invalid IDs or Grades
+        if (!studentId || isNaN(regGrade)) return;
+
+        if (!masterList.has(studentId)) {
+          masterList.set(studentId, {
+            id: studentId,
+            name: `${record.first_name || ''} ${record.last_name || ''}`.trim() || 'Unknown',
+            grade: regGrade || 0,
+            district: record.district || 'Unknown',
+            school: record.school_name || 'Unknown',
+            status: 'Absent'
+          });
+        }
+      });
+
+      const getLevelVal = (r, key) => {
+        const raw = r[key] || r[key.toUpperCase()];
+        if (typeof raw === 'string' && raw.trim().toLowerCase() === 'pre-primary') return 0;
+        return parseInt(raw);
+      };
+
+      const processSubjectRecords = (records, resultMap, subjectName) => {
+        records.forEach(record => {
+          const loginId = record.login_id;
+          if (!loginId || !masterList.has(loginId)) return;
+          const answers = [];
+          const levels = [];
+          for (let i = 1; i <= 20; i++) {
+            const ansRaw = record[`q${i}_answer`];
+            const lvlRaw = getLevelVal(record, `q${i}_level`);
+            answers.push(ansRaw === "" || ansRaw === undefined ? NaN : parseInt(ansRaw));
+            levels.push(lvlRaw);
+          }
+          const masteryLevel = calculateMasteryLevel(answers, levels);
+          resultMap.set(loginId, {
+            answers, levels, masteryLevel,
+            stats: calculateLevelStats(answers, levels)
+          });
+          masterList.get(loginId).status = 'Participated';
+        });
+      };
+
+      processSubjectRecords(mathRecords, mathResults, 'Math');
+      processSubjectRecords(englishRecords, englishResults, 'English');
+
+      mergeStudentData();
+      updateAllVisualizations();
+    }
+
+    function calculateLevelStats(answers, levels) {
+      const stats = {};
+      for (let i = 0; i < answers.length; i++) {
+        const level = levels[i];
+        const ans = answers[i];
+        if (isNaN(level) || isNaN(ans)) continue;
+
+        if (!stats[level]) stats[level] = { correct: 0, total: 0, percentage: 0 };
+        stats[level].total++;
+        if (ans === 1) stats[level].correct++;
+      }
+      Object.keys(stats).forEach(level => {
+        if (stats[level].total > 0)
+          stats[level].percentage = (stats[level].correct / stats[level].total) * 100;
+      });
+      return stats;
+    }
+
+    function mergeStudentData() {
+      allStudentsData = [];
+      masterList.forEach((student, studentId) => {
+
+        const mathData = mathResults.get(studentId) || { masteryLevel: 0, stats: {}, answers: [], levels: [] };
+        const englishData = englishResults.get(studentId) || { masteryLevel: 0, stats: {}, answers: [], levels: [] };
+
+        const countCorrect = (list) => list.filter(v => v === 1).length;
+        const countAttempted = (list) => list.filter(v => !isNaN(v)).length;
+
+        const mathCorrect = countCorrect(mathData.answers);
+        const mathAttempted = countAttempted(mathData.answers);
+        const englishCorrect = countCorrect(englishData.answers);
+        const englishAttempted = countAttempted(englishData.answers);
+
+        const totalAttempted = mathAttempted + englishAttempted;
+        const scorePercentage = totalAttempted > 0 ? ((mathCorrect + englishCorrect) / totalAttempted) * 100 : 0;
+
+        let mathMastery = mathData.masteryLevel;
+        let englishMastery = englishData.masteryLevel;
+        const registeredGrade = student.grade;
+
+        // Custom Logic: Grade 1 students at Level 2 should be shown as Level 1
+        if (registeredGrade === 1) {
+          if (mathMastery === 2) mathMastery = 1;
+          if (englishMastery === 2) englishMastery = 1;
+        }
+
+        const targetLevel = Math.min(7, registeredGrade);
+
+        allStudentsData.push({
+          id: student.id, name: student.name, registeredGrade: registeredGrade,
+          district: student.district, school: student.school, status: student.status,
+          mathMastery: mathMastery, englishMastery: englishMastery,
+          mathScore: mathAttempted > 0 ? (mathCorrect / mathAttempted) * 100 : 0,
+          englishScore: englishAttempted > 0 ? (englishCorrect / englishAttempted) * 100 : 0,
+          mathGap: mathMastery - targetLevel,
+          englishGap: englishMastery - targetLevel,
+          mathStats: mathData.stats, englishStats: englishData.stats,
+          scorePercentage: scorePercentage,
+          participated: student.status === 'Participated'
+        });
+      });
+    }
+
+    // ===== UI UPDATES =====
+    function updateAllVisualizations() {
+      updateKPIMetrics();
+      updateCharts();
+      populateAllStudentsTable();
+      updateFilters();
+      updateGapDistributionTable();
+      updateQuestionAnalysis();
+      updateLOChart();
+    }
+
+    function updateLOChart() {
+      if (loMap.size === 0) return;
+
+      const gradeFilter = document.getElementById('q-perf-grade').value;
+      const subjectFilter = document.getElementById('q-perf-subject').value;
+      const loStats = {};
+
+      allStudentsData.forEach(student => {
+        if (!student.participated) return;
+        if (gradeFilter !== 'all' && student.registeredGrade != gradeFilter) return;
+
+        const addSubjectStats = (subject, resultsMap) => {
+          if (resultsMap.has(student.id)) {
+            const data = resultsMap.get(student.id);
+            data.answers.forEach((ans, idx) => {
+              if (isNaN(ans)) return;
+              const studentGrade = student.registeredGrade;
+              const loName = loMap.get(`${subject}-${studentGrade}-${idx + 1}`);
+              if (loName) {
+                if (!loStats[loName]) {
+                  loStats[loName] = {
+                    correct: 0,
+                    total: 0,
+                    subject: subject,
+                    questions: new Set()
+                  };
+                }
+                loStats[loName].total++;
+                loStats[loName].questions.add(idx + 1);
+                if (ans === 1) loStats[loName].correct++;
+              }
+            });
+          }
+        };
+        addSubjectStats('Math', mathResults);
+        addSubjectStats('English', englishResults);
+      });
+
+      const mathBody = document.getElementById('math-lo-detailed-table-body');
+      const englishBody = document.getElementById('english-lo-detailed-table-body');
+
+      mathBody.innerHTML = '';
+      englishBody.innerHTML = '';
+
+      // Calculate percentages and sort ASCENDING as requested
+      const loList = Object.keys(loStats).map(key => {
+        const s = loStats[key];
+        return {
+          name: key,
+          perc: (s.correct / s.total * 100),
+          ...s
+        };
+      }).sort((a, b) => a.perc - b.perc); // ASCENDING SORT
+
+      let mathCount = 0;
+      let englishCount = 0;
+
+      loList.forEach(item => {
+        if (subjectFilter !== 'all' && subjectFilter !== item.subject.toLowerCase()) return;
+
+        const passed = item.perc >= 60;
+        const qNumbers = Array.from(item.questions).sort((a, b) => a - b).map(q => `Q${q}`).join(', ');
+
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-gray-50 border-b border-gray-100 transition-colors cursor-pointer";
+        tr.innerHTML = `
+                <td class="py-3 px-3 font-semibold text-gray-800 border-b">${item.name}</td>
+                <td class="py-3 px-2 text-center text-gray-500 font-medium border-b">${qNumbers}</td>
+                <td class="py-3 px-2 text-center font-bold border-b ${passed ? 'text-green-600' : 'text-red-600'}">${item.perc.toFixed(1)}%</td>
+                <td class="py-3 px-2 text-center border-b">
+                    <span class="status-badge px-2 py-0.5 rounded-full text-[9px] ${passed ? 'bg-green-600 text-white' : 'bg-red-500 text-white'}">
+                        ${passed ? 'Prof' : 'Needs Focus'}
+                    </span>
+                </td>
+            `;
+        tr.onclick = () => showCurriculumDrilldown('lo', item.name);
+
+        if (item.subject === 'Math') {
+          mathBody.appendChild(tr);
+          mathCount++;
+        } else {
+          englishBody.appendChild(tr);
+          englishCount++;
+        }
+      });
+
+      if (mathCount === 0) mathBody.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-gray-400 italic">No math data.</td></tr>';
+      if (englishCount === 0) englishBody.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-gray-400 italic">No english data.</td></tr>';
+    }
+
+    function updateKPIMetrics() {
+      const totalStudents = allStudentsData.length;
+      const participatedData = allStudentsData.filter(s => s.participated);
+      const participated = participatedData.length;
+      const participationRate = totalStudents > 0 ? ((participated / totalStudents) * 100).toFixed(1) : 0;
+
+      document.getElementById('total-registered-count').textContent = totalStudents;
+      document.getElementById('participated-count').textContent = participated;
+      document.getElementById('participated-percentage').textContent = participationRate + '% of total';
+      document.getElementById('absent-count').textContent = totalStudents - participated;
+      document.getElementById('absent-percentage').textContent = (100 - parseFloat(participationRate)).toFixed(1) + '% of total';
+    }
+
+    function updateCharts() {
+      const gradeGroups = {};
+      allStudentsData.forEach(student => {
+        const grade = student.registeredGrade;
+        if (!gradeGroups[grade]) gradeGroups[grade] = { mathLevels: [], englishLevels: [], mathScores: [], englishScores: [], count: 0, participated: 0, total: 0 };
+        gradeGroups[grade].total++;
+        if (student.participated) {
+          gradeGroups[grade].mathLevels.push(student.mathMastery);
+          gradeGroups[grade].englishLevels.push(student.englishMastery);
+          gradeGroups[grade].mathScores.push(student.mathScore);
+          gradeGroups[grade].englishScores.push(student.englishScore);
+          gradeGroups[grade].count++;
+          gradeGroups[grade].participated++;
+        }
+      });
+
+      const totalStudents = allStudentsData.length;
+      const participated = allStudentsData.filter(s => s.participated).length;
+      const rate = totalStudents > 0 ? (participated / totalStudents * 100) : 0;
+
+      if (participationDonut) {
+        participationDonut.data.datasets[0].data = [rate.toFixed(1), (100 - rate).toFixed(1)];
+        participationDonut.update();
+      }
+
+      if (gradeParticipationChart) {
+        const chartGrades = Object.keys(gradeGroups).sort((a, b) => parseInt(a) - parseInt(b));
+        const participationData = chartGrades.map(g => gradeGroups[g].total > 0 ? (gradeGroups[g].participated / gradeGroups[g].total * 100).toFixed(1) : 0);
+
+        // Color coding logic
+        const barColors = participationData.map(val => {
+          const p = parseFloat(val);
+          if (p >= 90) return '#6366f1'; // Indigo/Blue
+          if (p >= 60) return '#f97316'; // Orange
+          return '#ef4444'; // Red
+        });
+
+        gradeParticipationChart.data.labels = chartGrades.map(g => `Grade ${g}`);
+        gradeParticipationChart.data.datasets[0].data = participationData;
+        gradeParticipationChart.data.datasets[0].backgroundColor = barColors; // Apply colors
+        gradeParticipationChart.data.datasets[0].counts = chartGrades.map(g => gradeGroups[g].participated);
+        gradeParticipationChart.data.datasets[0].totals = chartGrades.map(g => gradeGroups[g].total); // Store total registered
+        // Bench mark line data
+        gradeParticipationChart.data.datasets[1].data = chartGrades.map(() => 75);
+        gradeParticipationChart.update();
+      }
+    }
+
+    function updateGapDistributionTable() {
+      const mathTbody = document.getElementById('math-gap-distribution-body');
+      const englishTbody = document.getElementById('english-gap-distribution-body');
+      mathTbody.innerHTML = '';
+      englishTbody.innerHTML = '';
+
+      const gradeFilterSelect = document.getElementById('gap-dist-grade-filter').value;
+
+      const uniqueGrades = [...new Set(allStudentsData.map(s => s.registeredGrade))].sort((a, b) => a - b);
+
+      const getDistForSubject = (sub) => {
+        const dist = {};
+        uniqueGrades.forEach(g => {
+          dist[g] = { l0: 0, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0, l6: 0, l7: 0 };
+        });
+
+        allStudentsData.forEach(s => {
+          if (!s.participated || !dist[s.registeredGrade]) return;
+          let m = Math.floor((sub === 'math') ? s.mathMastery : s.englishMastery);
+          if (m > 7) m = 7;
+          dist[s.registeredGrade][`l${m}`]++;
+        });
+        return dist;
+      };
+
+      const distMath = getDistForSubject('math');
+      const distEng = getDistForSubject('english');
+
+      const populateBody = (tbody, dist, filter, subjectName) => {
+        tbody.innerHTML = '';
+        const grades = Object.keys(dist).sort((a, b) => parseInt(a) - parseInt(b));
+        grades.forEach(gStr => {
+          const gNum = parseInt(gStr);
+          if (filter !== 'all' && gNum != filter) return;
+          const d = dist[gNum];
+          const row = document.createElement('tr');
+          row.className = "border-b hover:bg-gray-50";
+
+          const target = Math.min(7, gNum);
+
+          let colsHtml = `<td class="p-2 border font-bold text-left sticky left-0 bg-white group-hover:bg-gray-50 text-xs">Grade ${gNum}</td>`;
+
+          for (let i = 0; i <= 7; i++) {
+            if (i <= target) {
+              let color;
+              if (i >= target) {
+                color = '#3F8471'; // Green - Competent
+              } else if (i >= target - 2 && i > 0) {
+                color = '#F69741'; // Orange - Bridge the Gap
+              } else if (i === 0) {
+                if (gNum === 1 || gNum === 2) {
+                  color = '#F69741'; // Orange for Level 0 in Grade 1 and 2
+                } else {
+                  color = '#DC2626'; // Red - FLN readiness needed
+                }
+              } else {
+                color = '#DC2626'; // Red - FLN readiness needed
+              }
+              // Added onClick, cursor-pointer, hover effects
+              colsHtml += `<td onclick="showFilteredGapList(${gNum}, 'Level ${i}', '${subjectName}')" class="p-2 border font-bold text-white cursor-pointer hover:opacity-80 transition-opacity transform hover:scale-105" style="background-color: ${color}">${d[`l${i}`]}</td>`;
+            } else {
+              colsHtml += `<td class="p-2 border font-bold text-gray-400 bg-gray-50">-</td>`;
+            }
+          }
+
+          row.innerHTML = colsHtml;
+          tbody.appendChild(row);
+        });
+      };
+
+      populateBody(mathTbody, distMath, gradeFilterSelect, 'math');
+      populateBody(englishTbody, distEng, gradeFilterSelect, 'english');
+    }
+
+    function showFilteredGapList(gradeNum, gapTypeLabel, explicitSubject = null) {
+      const container = document.getElementById('grade-specific-list-container');
+      const title = document.getElementById('selected-grade-title');
+      const tbody = document.getElementById('grade-specific-table-body');
+
+      let subjectFilter = explicitSubject || 'math';
+
+      container.classList.remove('hidden');
+      title.textContent = `Students in Grade ${gradeNum} - ${gapTypeLabel} (${subjectFilter.toUpperCase()})`;
+      tbody.innerHTML = '';
+
+      const filteredStudents = allStudentsData.filter(s => {
+        if (!s.participated || s.registeredGrade !== gradeNum) return false;
+
+        let mastery = (subjectFilter === 'math') ? s.mathMastery : s.englishMastery;
+        const levelRequest = parseInt(gapTypeLabel.replace('Level ', '').replace('Lvl ', '').replace('+', ''));
+
+        return Math.floor(mastery) === levelRequest;
+      });
+
+      // Helper function to match the color logic from updateGapDistributionTable
+      const getMasteryColor = (level, grade) => {
+        const target = Math.min(7, grade);
+        if (level >= target) {
+          return '#3F8471'; // Green - Competent
+        } else if (level >= target - 2 && level > 0) {
+          return '#F69741'; // Orange - Bridge the Gap
+        } else if (level === 0) {
+          if (grade === 1 || grade === 2) {
+            return '#F69741'; // Orange for Level 0 in Grade 1 and 2
+          } else {
+            return '#DC2626'; // Red - FLN readiness needed
+          }
+        } else {
+          return '#DC2626'; // Red - FLN readiness needed
+        }
+      };
+
+      if (filteredStudents.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-20 text-gray-400">
+                <div class="flex flex-col items-center">
+                    <span class="text-6xl mb-4">🔍</span>
+                    <p class="text-lg font-bold">No students found matching this criteria.</p>
+                </div>
+            </td></tr>`;
+      } else {
+        filteredStudents.sort((a, b) => a.name.localeCompare(b.name)).forEach(student => {
+          const row = document.createElement('tr');
+          row.className = 'hover:bg-gray-50 border-b border-gray-100 transition-colors cursor-pointer';
+
+          const engColor = getMasteryColor(student.englishMastery, student.registeredGrade);
+          const mathColor = getMasteryColor(student.mathMastery, student.registeredGrade);
+
+          row.innerHTML = `
+                    <td class="py-4 px-4 font-bold text-blue-600">${student.id}</td>
+                    <td class="py-4 px-4 font-semibold text-gray-800">${student.name}</td>
+                    <td class="py-4 px-4 text-center font-bold" style="color: ${engColor}">${student.englishMastery}</td>
+                    <td class="py-4 px-4 text-center font-bold" style="color: ${mathColor}">${student.mathMastery}</td>
+                    <td class="py-4 px-4 text-center">
+                        <button class="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded border border-blue-200 hover:bg-blue-100 font-bold transition-colors">
+                            View Report
+                        </button>
+                    </td>
+                `;
+          row.onclick = () => showDetailedStudentReport(student);
+          tbody.appendChild(row);
+        });
+      }
+
+      container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function renderParticipationDrilldown() {
+      const container = document.getElementById('general-drilldown-container');
+      const title = document.getElementById('drilldown-title');
+      const header = document.getElementById('drilldown-table-header');
+      const tbody = document.getElementById('drilldown-table-body');
+      const filterVal = document.getElementById('participation-list-status-filter').value;
+
+      container.classList.remove('hidden');
+      title.textContent = `Grade ${currentParticipationGrade} - Detailed Participation List`;
+
+      header.innerHTML = `
+            <tr class="bg-gray-50 text-gray-800">
+                <th class="py-4 px-4 text-left font-bold border-b">Student ID</th>
+                <th class="py-4 px-4 text-left font-bold border-b">Name</th>
+                <th class="py-4 px-4 text-center font-bold border-b">Participation Status</th>
+                <th class="py-4 px-4 text-center font-bold border-b">Action</th>
+            </tr>
+        `;
+
+      const filtered = allStudentsData.filter(s => {
+        if (s.registeredGrade !== currentParticipationGrade) return false;
+        if (filterVal === 'participated') return s.participated;
+        if (filterVal === 'absent') return !s.participated;
+        return true;
+      }).sort((a, b) => a.name.localeCompare(b.name));
+
+      tbody.innerHTML = '';
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-20 text-gray-400 font-bold">No students match this filter.</td></tr>';
+      } else {
+        filtered.forEach(s => {
+          const tr = document.createElement('tr');
+
+          let actionContent;
+          if (s.participated) {
+            tr.className = "hover:bg-gray-50 border-b border-gray-100 transition-colors cursor-pointer";
+            actionContent = `<button class="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded border border-blue-200 hover:bg-blue-100 font-bold">View Report</button>`;
+            tr.onclick = () => showDetailedStudentReport(s);
+          } else {
+            tr.className = "border-b border-gray-100 transition-colors cursor-default bg-gray-50/30";
+            actionContent = `<span class="text-xs text-red-500 font-bold italic">Please attend the next exam</span>`;
+            tr.onclick = null;
+          }
+
+          tr.innerHTML = `
+                    <td class="py-4 px-4 font-bold text-blue-600">${s.id}</td>
+                    <td class="py-4 px-4 font-semibold text-gray-800">${s.name}</td>
+                    <td class="py-4 px-4 text-center">
+                        <span class="status-badge px-3 py-1 rounded-lg ${s.participated ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                            ${s.status}
+                        </span>
+                    </td>
+                    <td class="py-4 px-4 text-center">
+                        ${actionContent}
+                    </td>
+                `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function showParticipationDrilldown(gradeNum) {
+      currentParticipationGrade = gradeNum;
+      renderParticipationDrilldown();
+    }
+
+    function renderCurriculumDrilldown() {
+      const { type, value } = currentCurriculumDrilldown;
+      const container = document.getElementById('curriculum-drilldown-container');
+      const title = document.getElementById('curriculum-drilldown-title');
+      const header = document.getElementById('curriculum-drilldown-header');
+      const tbody = document.getElementById('curriculum-drilldown-body');
+      const filterVal = document.getElementById('curriculum-list-result-filter').value;
+      const requirementInfo = document.getElementById('curriculum-requirement-info');
+
+      const subjectFilter = document.getElementById('q-perf-subject').value;
+      const gradeFilter = document.getElementById('q-perf-grade').value;
+
+      container.classList.remove('hidden');
+      tbody.innerHTML = '';
+      requirementInfo.textContent = '';
+
+      let questionCols = [];
+      if (type === 'question') {
+        title.textContent = `Question ${value} Analysis`;
+        questionCols.push({ label: `Q${value}`, qNum: value });
+
+        let loInfo = "Learning Objective: Not mapped.";
+        if (gradeFilter !== 'all' && subjectFilter !== 'all') {
+          const normSubject = subjectFilter.toLowerCase().includes('math') ? 'Math' : 'English';
+          const key = `${normSubject}-${gradeFilter}-${value}`;
+          if (loMap.has(key)) loInfo = `Requirement: ${loMap.get(key)}`;
+        }
+        requirementInfo.textContent = loInfo;
+      } else if (type === 'lo') {
+        title.textContent = `LO Analysis: ${value}`;
+        requirementInfo.textContent = `Displaying question-level breakdown for this objective.`;
+
+        const relevantQs = new Set();
+        loMap.forEach((loName, key) => {
+          if (loName === value) {
+            const parts = key.split('-');
+            if (gradeFilter === 'all' || parts[1] === gradeFilter) {
+              relevantQs.add(parseInt(parts[2]));
+            }
+          }
+        });
+        questionCols = Array.from(relevantQs).sort((a, b) => a - b).map(q => ({ label: `Q${q}`, qNum: q }));
+      }
+
+      let headerHtml = `
+            <tr class="bg-gray-50 text-gray-800">
+                <th class="py-4 px-4 text-left font-bold border-b">Student ID</th>
+                <th class="py-4 px-4 text-left font-bold border-b">Name</th>
+                <th class="py-4 px-4 text-center font-bold border-b">Grade</th>
+        `;
+      questionCols.forEach(col => {
+        headerHtml += `<th class="py-4 px-2 text-center font-bold border-b">${col.label}</th>`;
+      });
+      headerHtml += `</tr>`;
+      header.innerHTML = headerHtml;
+
+      let matchFound = false;
+      allStudentsData.forEach(s => {
+        if (!s.participated) return;
+        if (gradeFilter !== 'all' && s.registeredGrade != gradeFilter) return;
+
+        const studentAnswers = [];
+        questionCols.forEach(col => {
+          let ans = null;
+          const checkSubject = (sub, resultsMap) => {
+            if (subjectFilter === 'all' || subjectFilter === sub.toLowerCase()) {
+              const data = resultsMap.get(s.id);
+              if (data && !isNaN(data.answers[col.qNum - 1])) {
+                ans = data.answers[col.qNum - 1];
+              }
+            }
+          };
+          checkSubject('Math', mathResults);
+          if (ans === null) checkSubject('English', englishResults);
+          studentAnswers.push(ans);
+        });
+
+        if (studentAnswers.every(a => a === null)) return;
+
+        const correctCount = studentAnswers.filter(a => a === 1).length;
+        const totalCount = studentAnswers.filter(a => a !== null).length;
+        const isProficient = totalCount > 0 ? (correctCount / totalCount >= 0.6) : false;
+
+        if (filterVal === 'pass' && !isProficient) return;
+        if (filterVal === 'fail' && isProficient) return;
+
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-gray-50 border-b border-gray-100 transition-colors cursor-pointer";
+
+        let rowHtml = `
+                <td class="py-4 px-4 font-bold text-blue-600">${s.id}</td>
+                <td class="py-4 px-4 font-semibold text-gray-800">${s.name}</td>
+                <td class="py-4 px-4 text-center">G${s.registeredGrade}</td>
+            `;
+
+        studentAnswers.forEach(ans => {
+          const icon = ans === 1 ? '✓' : (ans === 0 ? '✗' : '-');
+          const color = ans === 1 ? 'text-green-600' : (ans === 0 ? 'text-red-600' : 'text-gray-400');
+          rowHtml += `<td class="py-4 px-2 text-center font-bold text-lg ${color}">${icon}</td>`;
+        });
+
+        tr.innerHTML = rowHtml;
+        tr.onclick = () => showDetailedStudentReport(s);
+        tbody.appendChild(tr);
+        matchFound = true;
+      });
+
+      if (!matchFound) {
+        tbody.innerHTML = `<tr><td colspan="${3 + questionCols.length}" class="text-center py-20 text-gray-400 font-bold">No students found matching current filters.</td></tr>`;
+      }
+
+      container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function showCurriculumDrilldown(type, value) {
+      currentCurriculumDrilldown = { type, value };
+      renderCurriculumDrilldown();
+    }
+
+    function updateQuestionAnalysis() {
+      const subjectFilter = document.getElementById('q-perf-subject').value;
+      const gradeFilter = document.getElementById('q-perf-grade').value;
+      const qStats = Array(20).fill(0).map(() => ({ correct: 0, total: 0 }));
+
+      allStudentsData.forEach(s => {
+        if (!s.participated || (gradeFilter !== 'all' && s.registeredGrade != gradeFilter)) return;
+        const addStats = (resultsMap) => {
+          if (resultsMap.has(s.id)) {
+            resultsMap.get(s.id).answers.forEach((ans, idx) => {
+              if (idx < 20 && !isNaN(ans)) { qStats[idx].total++; if (ans === 1) qStats[idx].correct++; }
+            });
+          }
+        };
+        if (subjectFilter === 'all' || subjectFilter === 'math') addStats(mathResults);
+        if (subjectFilter === 'all' || subjectFilter === 'english') addStats(englishResults);
+      });
+
+      const percentages = qStats.map(q => q.total > 0 ? ((q.correct / q.total) * 100).toFixed(1) : 0);
+      if (questionPerformanceChart) {
+        questionPerformanceChart.data.datasets[0].data = percentages;
+        questionPerformanceChart.update();
+      }
+
+      const tbody = document.getElementById('question-stats-body');
+      tbody.innerHTML = '';
+      const row = document.createElement('tr');
+      let html = '<td class="p-2 border font-bold bg-gray-50 text-xs">Avg Score</td>';
+      percentages.forEach(p => {
+        html += `<td class="p-2 border text-xs ${parseFloat(p) >= 60 ? 'text-green-600 font-bold' : 'text-red-600'}">${p}%</td>`;
+      });
+      row.innerHTML = html;
+      tbody.appendChild(row);
+    }
+
+    function populateAllStudentsTable(filter = null) {
+      const tbody = document.getElementById('all-students-table-body');
+      tbody.innerHTML = '';
+      let filteredData = [...allStudentsData];
+
+      if (filter === 'participated') filteredData = filteredData.filter(s => s.participated);
+      else if (filter === 'absent') filteredData = filteredData.filter(s => !s.participated);
+
+      const directoryGradeFilter = document.getElementById('directory-grade-filter').value;
+      if (directoryGradeFilter !== 'all') {
+        filteredData = filteredData.filter(s => s.registeredGrade == directoryGradeFilter);
+      }
+
+      const districtFilter = document.getElementById('directory-district-filter').value;
+      if (districtFilter !== 'all') {
+        filteredData = filteredData.filter(s => s.district === districtFilter);
+      }
+
+      const schoolFilter = document.getElementById('directory-school-filter').value;
+      if (schoolFilter !== 'all') {
+        filteredData = filteredData.filter(s => s.school === schoolFilter);
+      }
+
+      filteredData.sort((a, b) => a.name.localeCompare(b.name));
+
+      if (filteredData.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-20 text-gray-400">
+              <div class="flex flex-col items-center">
+                  <span class="text-6xl mb-4">🚫</span>
+                  <p class="text-lg font-bold">No students found.</p>
+                  <p class="text-sm">Try clearing filters or checking sync status.</p>
+              </div>
+          </td></tr>`;
+        return;
+      }
+
+      filteredData.forEach(student => {
+        const row = document.createElement('tr');
+
+        if (student.participated) {
+          row.className = 'student-row border-b border-gray-200 cursor-pointer hover:bg-gray-50';
+          row.onclick = () => showDetailedStudentReport(student);
+        } else {
+          row.className = 'student-row border-b border-gray-200 cursor-default bg-gray-50/50';
+          // Click disabled for absent students
+        }
+
+        row.innerHTML = `
+          <td class="py-4 px-3 font-bold text-blue-600 border border-gray-200">${student.id}</td>
+          <td class="py-4 px-3 text-gray-800 font-semibold border border-gray-200">${student.name}</td>
+          <td class="py-4 px-3 text-center font-bold border border-gray-200">Grade ${student.registeredGrade}</td>
+          <td class="py-4 px-3 text-gray-700 border border-gray-200">${student.district}</td>
+          <td class="py-4 px-3 text-gray-700 border border-gray-200">${student.school}</td>
+          <td class="py-4 px-3 text-center font-bold text-green-600 border border-gray-200">${student.englishMastery}</td>
+          <td class="py-4 px-3 text-center font-bold text-blue-600 border border-gray-200">${student.mathMastery}</td>
+          <td class="py-4 px-3 text-center border border-gray-200">${student.participated ? '<span class="status-badge px-3 py-1 bg-green-600 text-white rounded-full">✓ Participated</span>' : '<span class="status-badge px-3 py-1 bg-red-600 text-white rounded-full">✗ Absent</span>'}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function showDetailedStudentReport(student) {
+      showSection('report-card');
+      document.getElementById('report-student-name').textContent = student.name;
+      document.getElementById('report-student-id').textContent = student.id;
+      document.getElementById('report-student-grade').textContent = 'Grade ' + student.registeredGrade;
+      document.getElementById('report-student-school').textContent = student.school;
+      document.getElementById('report-student-district').textContent = student.district;
+      document.getElementById('report-btn-grade').textContent = student.registeredGrade;
+
+      // Update button to view paper
+      const btn = document.getElementById('report-view-paper-btn');
+      if (btn) btn.onclick = () => openPaperModal(student.registeredGrade);
+
+      const updateSubjectUI = (sub) => {
+        document.getElementById(`report-${sub}-registered`).textContent = 'Grade ' + student.registeredGrade;
+        document.getElementById(`report-${sub}-mastery`).textContent = student[`${sub}Mastery`];
+
+        const mastery = student[`${sub}Mastery`];
+        const target = Math.min(7, student.registeredGrade);
+        const gapEl = document.getElementById(`report-${sub}-gap`);
+
+        // Gap calculation: registered grade - Mastery Level
+        const gap = target - mastery;
+
+        if (gap <= 0) {
+          gapEl.textContent = "At Grade Level";
+          gapEl.className = "font-bold text-lg text-green-600";
+        } else {
+          gapEl.textContent = `${gap} Year(s) Below`;
+          // Color coding: 1-2 years = Amber, 3+ years = Red
+          gapEl.className = `font-bold text-lg ${gap >= 3 ? 'text-red-600' : 'text-amber-600'}`;
+        }
+
+        const stats = student[`${sub}Stats`];
+        const div = document.getElementById(`report-${sub}-questions`);
+        if (stats && Object.keys(stats).length > 0) {
+          let html = '<div class="space-y-1">';
+          Object.keys(stats).sort((a, b) => parseInt(a) - parseInt(b)).forEach(lvl => {
+            const s = stats[lvl];
+            const passed = s.percentage >= 60;
+            html += `<div class="flex justify-between text-xs"><span>Level ${lvl}:</span><span class="font-bold ${passed ? 'text-green-600' : 'text-red-600'}">${s.correct}/${s.total} (${s.percentage.toFixed(0)}%) ${passed ? '✓' : '✗'}</span></div>`;
+          });
+          div.innerHTML = html + '</div>';
+        } else div.innerHTML = `<p class="text-sm text-gray-500">No data</p>`;
+      };
+
+      updateSubjectUI('english');
+      updateSubjectUI('math');
+
+      // Enhanced Insights Logic
+      const insightContainer = document.getElementById('report-insights-container');
+      insightContainer.innerHTML = '';
+
+      const getPerformanceLabel = (mastery, grade) => {
+        const target = Math.min(7, grade);
+        // Logic: Competent (at or above target), Bridge Gap (1-2 levels below), FLN (more than 2 below or 0)
+        if (mastery >= target) {
+          return { text: "Competent", colorClass: "text-green-800 bg-green-50 border-green-500", icon: "🌟" };
+        } else if (mastery >= target - 2 && mastery > 0) {
+          return { text: "Bridge the Gap", colorClass: "text-orange-800 bg-orange-50 border-orange-500", icon: "📈" };
+        } else {
+          return { text: "FLN readiness needed", colorClass: "text-red-800 bg-red-50 border-red-500", icon: "🚨" };
+        }
+      };
+
+      ['English', 'Math'].forEach(sub => {
+        const key = sub.toLowerCase();
+        const mastery = student[`${key}Mastery`];
+        const status = getPerformanceLabel(mastery, student.registeredGrade);
+
+        insightContainer.innerHTML += `
+            <div class="insight-card ${status.colorClass} border-l-4 p-4 rounded-r-lg shadow-sm">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">${status.icon}</span>
+                    <div>
+                        <h4 class="font-bold uppercase text-xs tracking-wider opacity-70">${sub} Status</h4>
+                        <p class="font-bold text-lg">${status.text}</p>
+                    </div>
+                </div>
+            </div>`;
+      });
+
+      const mathLoBody = document.getElementById('report-math-lo-body');
+      const englishLoBody = document.getElementById('report-english-lo-body');
+      mathLoBody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-gray-500">No data.</td></tr>';
+      englishLoBody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-gray-500">No data.</td></tr>';
+
+      if (loMap.size > 0) {
+        ['English', 'Math'].forEach(sub => {
+          const stats = {};
+          const data = (sub === 'Math' ? mathResults : englishResults).get(student.id);
+          if (data) {
+            data.answers.forEach((ans, idx) => {
+              if (isNaN(ans)) return;
+              const lo = loMap.get(`${sub}-${student.registeredGrade}-${idx + 1}`);
+              if (lo) {
+                if (!stats[lo]) stats[lo] = { correct: 0, total: 0, questions: [] };
+                stats[lo].total++;
+                const isCorrect = ans === 1;
+                if (isCorrect) stats[lo].correct++;
+                stats[lo].questions.push({ q: idx + 1, correct: isCorrect });
+              }
+            });
+          }
+
+          const keys = Object.keys(stats).sort();
+          const targetBody = sub === 'Math' ? mathLoBody : englishLoBody;
+          if (keys.length > 0) {
+            targetBody.innerHTML = '';
+            keys.forEach(lo => {
+              const s = stats[lo];
+              const perc = (s.correct / s.total * 100);
+              const passed = perc >= 60;
+
+              // Sort questions numerically
+              s.questions.sort((a, b) => a.q - b.q);
+
+              // Create styled question string
+              const questionsHtml = s.questions.map(item => {
+                return `<span class="${item.correct ? 'text-green-600' : 'text-red-600'} font-bold mx-0.5">Q${item.q}</span>`;
+              }).join(', ');
+
+              const tr = document.createElement('tr'); tr.className = "border-b border-gray-50";
+              tr.innerHTML = `
+                                <td class="text-left py-2 px-3 font-semibold text-gray-700 border">${lo}</td>
+                                <td class="text-center py-2 px-2 font-bold border ${passed ? 'text-green-600' : 'text-red-600'}">${perc.toFixed(0)}%</td>
+                                <td class="text-left py-2 px-3 border leading-relaxed">
+                                  ${questionsHtml}
+                                </td>`;
+              targetBody.appendChild(tr);
+            });
+          }
+        });
+      }
+    }
+
+    function viewQuestionPaper(grade) {
+      // Old function replaced by openPaperModal
+      openPaperModal(grade);
+    }
+
+    // New Modal Functionality
+    function openPaperModal(grade) {
+      const modal = document.getElementById('paper-modal');
+      const frame = document.getElementById('modal-paper-frame');
+      const titleGrade = document.getElementById('modal-grade-badge');
+      const fallbackMsg = document.getElementById('modal-fallback-msg');
+
+      let url = FOLDER_LINK;
+      let isSpecific = false;
+      const isGradeSelected = grade && grade !== 'all';
+
+      if (isGradeSelected && QUESTION_PAPERS[grade]) {
+        url = QUESTION_PAPERS[grade];
+        isSpecific = true;
+      }
+
+      frame.src = url;
+      titleGrade.textContent = isGradeSelected ? `Grade ${grade}` : 'All Grades';
+
+      if (isSpecific) {
+        fallbackMsg.classList.add('hidden');
+      } else {
+        fallbackMsg.classList.remove('hidden');
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closePaperModal() {
+      const modal = document.getElementById('paper-modal');
+      const frame = document.getElementById('modal-paper-frame');
+      modal.classList.add('hidden');
+      frame.src = ""; // Stop loading
+    }
+
+    function updateFilters() {
+      const gVals = [...new Set(allStudentsData.map(s => s.registeredGrade))].sort((a, b) => a - b);
+      const gapGradeEl = document.getElementById('gap-dist-grade-filter');
+      gapGradeEl.innerHTML = '<option value="all">All Grades</option>' + gVals.map(g => `<option value="${g}">Grade ${g}</option>`).join('');
+      const dirGradeEl = document.getElementById('directory-grade-filter');
+      if (dirGradeEl) {
+        dirGradeEl.innerHTML = '<option value="all">Filter by Grade: All</option>' + gVals.map(g => `<option value="${g}">Grade ${g}</option>`).join('');
+      }
+      const qGradeEl = document.getElementById('q-perf-grade');
+      if (qGradeEl) {
+        qGradeEl.innerHTML = '<option value="all">All Grades</option>' + gVals.map(g => `<option value="${g}">Grade ${g}</option>`).join('');
+      }
+
+      const districts = [...new Set(allStudentsData.map(s => s.district).filter(d => d))].sort();
+      const schools = [...new Set(allStudentsData.map(s => s.school).filter(s => s))].sort();
+
+      const districtEl = document.getElementById('directory-district-filter');
+      if (districtEl) {
+        districtEl.innerHTML = '<option value="all">Filter by District: All</option>' + districts.map(d => `<option value="${d}">${d}</option>`).join('');
+      }
+
+      const schoolEl = document.getElementById('directory-school-filter');
+      if (schoolEl) {
+        schoolEl.innerHTML = '<option value="all">Filter by School: All</option>' + schools.map(s => `<option value="${s}">${s}</option>`).join('');
+      }
+    }
+
+    const navItems = document.querySelectorAll('.nav-item');
+    const sections = document.querySelectorAll('.section-content');
+
+    function showSection(id) {
+      sections.forEach(s => s.classList.add('hidden'));
+      navItems.forEach(n => n.classList.remove('active'));
+      const target = document.getElementById(id);
+      if (target) target.classList.remove('hidden');
+      const active = document.querySelector(`[data-section="${id}"]`);
+      if (active) active.classList.add('active');
+
+      // Reset scroll position to top
+      const mainContainer = document.querySelector('main');
+      if (mainContainer) mainContainer.scrollTop = 0;
+    }
+
+    navItems.forEach(item => { item.onclick = (e) => { e.preventDefault(); showSection(item.getAttribute('data-section')); }; });
+    showSection('participation');
+
+    // SAFE EVENT BINDING HELPER
+    const addChangeListener = (id, fn) => {
+      const el = document.getElementById(id);
+      if (el) el.onchange = fn;
+    };
+
+    const addClickListener = (id, fn) => {
+      const el = document.getElementById(id);
+      if (el) el.onclick = fn;
+    };
+
+    const addInputListener = (id, fn) => {
+      const el = document.getElementById(id);
+      if (el) el.oninput = fn;
+    };
+
+    // Use safe binding
+    addChangeListener('directory-grade-filter', () => populateAllStudentsTable());
+    addChangeListener('directory-district-filter', () => populateAllStudentsTable());
+    addChangeListener('directory-school-filter', () => populateAllStudentsTable());
+    addChangeListener('participation-list-status-filter', () => renderParticipationDrilldown());
+    addChangeListener('curriculum-list-result-filter', () => renderCurriculumDrilldown());
+    addChangeListener('q-perf-subject', () => { updateQuestionAnalysis(); updateLOChart(); });
+    addChangeListener('q-perf-grade', () => {
+      updateQuestionAnalysis();
+      updateLOChart();
+      updateCAViewPaperButton();
+    });
+    addChangeListener('gap-dist-grade-filter', updateGapDistributionTable);
+
+    // Add logic for Curriculum Analysis view paper button
+    addClickListener('ca-view-paper-btn', () => {
+      const grade = document.getElementById('q-perf-grade').value;
+      openPaperModal(grade);
+    });
+
+    function updateCAViewPaperButton() {
+      const grade = document.getElementById('q-perf-grade').value;
+      const label = document.getElementById('ca-view-paper-text');
+      if (label) {
+        if (grade && grade !== 'all') {
+          label.textContent = `View Grade ${grade} Paper`;
+        } else {
+          label.textContent = "View Paper Repository";
+        }
+      }
+    }
+
+    document.querySelectorAll('.filter-btn').forEach(b => b.onclick = () => populateAllStudentsTable(b.getAttribute('data-filter')));
+    addClickListener('clear-filter', () => populateAllStudentsTable());
+    addInputListener('all-student-search', (e) => {
+      const s = e.target.value.toLowerCase();
+      document.querySelectorAll('#all-students-table-body tr').forEach(r => r.style.display = r.textContent.toLowerCase().includes(s) ? '' : 'none');
+    });
+    addClickListener('back-to-students', () => showSection('all-students'));
+
+    window.onload = () => {
+      initCharts();
+      syncWithGoogleSheets();
+    };
+
+    function initCharts() {
+      // Register plugin
+      Chart.register(ChartDataLabels);
+
+      questionPerformanceChart = new Chart(document.getElementById('question-performance-chart').getContext('2d'), {
+        type: 'bar',
+        plugins: [ChartDataLabels],
+        data: { labels: Array.from({ length: 20 }, (_, i) => `Q${i + 1}`), datasets: [{ label: 'Average Correct %', data: Array(20).fill(0), backgroundColor: '#8b5cf6', borderRadius: 4 }] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {
+            padding: {
+              top: 25 // Added padding to prevent label clipping
+            }
+          },
+          plugins: {
+            datalabels: {
+              color: '#4b5563',
+              anchor: 'end',
+              align: 'top',
+              formatter: (value) => Math.round(value) + '%',
+              font: {
+                weight: 'bold',
+                size: 10
+              }
+            }
+          },
+          scales: { y: { beginAtZero: true, max: 100 } },
+          onClick: (e, activeEls) => {
+            if (activeEls.length > 0) {
+              const firstPoint = activeEls[0];
+              const label = questionPerformanceChart.data.labels[firstPoint.index];
+              const qNum = parseInt(label.replace('Q', ''));
+              showCurriculumDrilldown('question', qNum);
+            }
+          }
+        }
+      });
+
+      participationDonut = new Chart(document.getElementById('participation-donut').getContext('2d'), {
+        type: 'doughnut',
+        plugins: [ChartDataLabels],
+        data: { labels: ['Participated', 'Absent'], datasets: [{ data: [0, 100], backgroundColor: ['#10B981', '#EF4444'], borderWidth: 4, borderColor: '#fff' }] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom' },
+            datalabels: { display: false } // Keep hidden for donut to avoid clutter
+          }
+        }
+      });
+
+      gradeParticipationChart = new Chart(document.getElementById('grade-participation-chart').getContext('2d'), {
+        plugins: [ChartDataLabels],
+        data: {
+          labels: [],
+          datasets: [
+            {
+              type: 'bar',
+              label: 'Participation %',
+              data: [],
+              backgroundColor: '#6366f1',
+              borderRadius: 6,
+              order: 1, // Background
+              datalabels: { display: true } // Explicitly enable for bars
+            },
+            {
+              type: 'line',
+              label: '75% Target',
+              data: [],
+              borderColor: '#ef4444',
+              borderWidth: 2,
+              borderDash: [5, 5],
+              pointRadius: 0,
+              fill: false,
+              order: 0, // Foreground (on top)
+              datalabels: { display: false } // Hide labels for the line
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {
+            padding: {
+              top: 25 // Added padding to prevent label clipping
+            }
+          },
+          scales: { y: { beginAtZero: true, max: 100 } },
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              callbacks: {
+                label: (c) => {
+                  if (c.datasetIndex === 0) {
+                    const count = c.dataset.counts ? c.dataset.counts[c.dataIndex] : 0;
+                    const total = c.dataset.totals ? c.dataset.totals[c.dataIndex] : 0;
+                    return [
+                      `Percentage: ${c.parsed.y}%`,
+                      `Participated: ${count}`,
+                      `Total Registered: ${total}`
+                    ];
+                  }
+                  return `${c.dataset.label}: 75%`;
+                }
+              }
+            },
+            datalabels: {
+              color: '#4b5563',
+              anchor: 'end',
+              align: 'top',
+              formatter: (value) => Math.round(value) + '%',
+              font: {
+                weight: 'bold'
+              }
+            }
+          },
+          onClick: (e, activeEls) => {
+            if (activeEls.length > 0) {
+              const firstPoint = activeEls[0];
+              const label = gradeParticipationChart.data.labels[firstPoint.index];
+              const gradeNum = parseInt(label.replace('Grade ', ''));
+              showParticipationDrilldown(gradeNum);
+            }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+
+</html>
